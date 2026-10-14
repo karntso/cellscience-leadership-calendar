@@ -100,12 +100,18 @@
     margin-bottom: 24px;
   }
   .sheet-link {
+    display: inline-flex;
+    align-items: center;
+    padding: 9px 18px;
+    border-radius: 999px;
+    background: #6464FF;
+    color: #fff;
     font-size: 0.85rem;
     font-weight: 700;
-    color: #6464FF;
     text-decoration: none;
+    transition: background 0.12s;
   }
-  .sheet-link:hover { text-decoration: underline; }
+  .sheet-link:hover { background: #4e4ecc; }
   .page-title {
     font-size: 1.5rem;
     font-weight: 700;
@@ -207,8 +213,8 @@
     top: 20px;
     transition: opacity 0.25s;
   }
-  .vs-quarter-year { font-size: 0.74rem; color: #999; font-weight: 700; }
-  .vs-quarter-q { font-size: 1.5rem; color: #6464FF; font-weight: 700; }
+  .vs-quarter-year { font-size: 0.86rem; color: #999; font-weight: 700; letter-spacing: 0.14em; }
+  .vs-quarter-q { font-size: 1.75rem; color: #6464FF; font-weight: 700; }
   .vs-months-col { display: flex; flex-direction: column; gap: 36px; }
   .vs-month-block { scroll-margin-top: 20px; }
   .vs-month-title {
@@ -217,12 +223,16 @@
     color: #222;
     margin-bottom: 10px;
   }
+  .calendar-grid-wrap {
+    overflow-x: auto;
+  }
   .calendar-grid {
     display: grid;
-    grid-template-columns: repeat(5, 1fr);
+    grid-template-columns: repeat(5, 132px);
     gap: 4px;
     background: transparent;
     border-radius: 12px;
+    width: fit-content;
   }
   .calendar-dow {
     background: #fff;
@@ -234,6 +244,7 @@
   }
   .calendar-day {
     background: #F5F5F4;
+    border: 1px solid #E5E2DC;
     border-radius: 8px;
     padding: 8px 9px;
     min-height: 100px;
@@ -265,6 +276,7 @@
   .vs-items-col {
     border-left: 1px solid #E5E2DC;
     padding-left: 14px;
+    margin-top: 32px;
   }
   .vs-items-label {
     font-size: 0.68rem;
@@ -313,7 +325,7 @@
 
 <div class="page-header">
   <div class="page-title">leadership calendar</div>
-  <a href="https://docs.google.com/spreadsheets/d/1H1cN97CCsAe9WrHzNTbNwQbGc3FIcndd/edit?usp=sharing" target="_blank" class="sheet-link">open sheet to edit →</a>
+  <a href="https://docs.google.com/spreadsheets/d/1H1cN97CCsAe9WrHzNTbNwQbGc3FIcndd/edit?usp=sharing" target="_blank" class="sheet-link">open sheet to edit</a>
 </div>
 
 <div id="pane-scroll" class="view-pane active">
@@ -558,7 +570,10 @@ function renderVerticalScroll(today) {
 
       grid.appendChild(cell);
     }
-    mainCol.appendChild(grid);
+    const gridWrap = document.createElement('div');
+    gridWrap.className = 'calendar-grid-wrap';
+    gridWrap.appendChild(grid);
+    mainCol.appendChild(gridWrap);
     inner.appendChild(mainCol);
 
     const itemsCol = document.createElement('div');
