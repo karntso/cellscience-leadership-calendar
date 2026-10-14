@@ -302,6 +302,15 @@
   .vs-item:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
   .vs-item-name { font-weight: 700; }
   .vs-item-date { color: #999; font-size: 0.72rem; margin-top: 2px; }
+  .vs-item-details {
+    margin: 6px 0 0;
+    padding-left: 16px;
+    font-size: 0.74rem;
+    color: #555;
+    line-height: 1.5;
+  }
+  .vs-item-details li { margin-bottom: 2px; }
+  .vs-item-details li:last-child { margin-bottom: 0; }
   .vs-items-empty { font-size: 0.78rem; color: #AAA; font-style: italic; }
   .cal-legend {
     margin-top: 20px;
@@ -411,6 +420,7 @@ function mapRow(row) {
     EventType: (row['Event Type'] || '').trim(),
     Start: (row['Start Date'] || '').trim(),
     End: (row['End Date'] || '').trim(),
+    Details: (row['Details'] || '').trim(),
     Notes: (row['Notes'] || '').trim()
   };
 }
@@ -501,6 +511,13 @@ function buildLegendHtml() {
   return `<div class="cal-legend">${typeRows}${oooRows}</div>`;
 }
 
+function buildDetailsHtml(details) {
+  if (!details) return '';
+  const lines = details.split('\n').map(l => l.trim()).filter(l => l).map(l => l.replace(/^[•\-\u2022]\s*/, ''));
+  if (!lines.length) return '';
+  return `<ul class="vs-item-details">${lines.map(l => `<li>${escHtml(l)}</li>`).join('')}</ul>`;
+}
+
 function renderItemsInto(container, items, emptyMsg) {
   if (!items.length) {
     container.innerHTML = `<div class="vs-items-empty">${escHtml(emptyMsg)}</div>`;
@@ -510,6 +527,7 @@ function renderItemsInto(container, items, emptyMsg) {
     <div class="vs-item">
       <div class="vs-item-name">${escHtml(item.EventTitle || item.Person)}</div>
       <div class="vs-item-date">${escHtml(formatDateRange(item.Start, item.End))}</div>
+      ${buildDetailsHtml(item.Details)}
     </div>
   `).join('');
 }
