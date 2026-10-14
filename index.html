@@ -1,0 +1,721 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Leadership Calendar</title>
+<style>
+  * , *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: Arial, sans-serif;
+    background: #FAFAF8;
+    color: #222;
+    padding: 28px 32px 60px;
+  }
+  #auth-overlay {
+    position: fixed;
+    inset: 0;
+    background: #6464FF;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+  }
+  #auth-overlay.hidden { display: none; }
+  #auth-box {
+    background: #fff;
+    border-radius: 12px;
+    padding: 40px 36px 36px;
+    width: 100%;
+    max-width: 380px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.18);
+    text-align: center;
+  }
+  #auth-box h2 {
+    font-size: 1.2rem;
+    font-weight: 700;
+    color: #222;
+    margin-bottom: 6px;
+  }
+  #auth-box p {
+    font-size: 0.85rem;
+    color: #888;
+    margin-bottom: 24px;
+  }
+  #auth-box input {
+    width: 100%;
+    padding: 10px 14px;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    font-size: 0.9rem;
+    margin-bottom: 12px;
+    outline: none;
+    transition: border-color 0.15s;
+  }
+  #auth-box input:focus { border-color: #6464FF; }
+  #auth-box button {
+    width: 100%;
+    padding: 11px;
+    background: #6464FF;
+    color: #fff;
+    border: none;
+    border-radius: 6px;
+    font-size: 0.95rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.15s;
+    margin-top: 4px;
+  }
+  #auth-box button:hover { background: #4e4ecc; }
+  #auth-error {
+    color: #cd0f55;
+    font-size: 0.8rem;
+    margin-top: 10px;
+    min-height: 18px;
+  }
+  @keyframes shake {
+    0%,100% { transform: translateX(0); }
+    20%,60% { transform: translateX(-8px); }
+    40%,80% { transform: translateX(8px); }
+  }
+  #auth-box.shake { animation: shake 0.4s ease; }
+  #dashboard-content { display: none; }
+  .page-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 16px;
+    margin-bottom: 24px;
+  }
+  .page-title {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: #222;
+  }
+  .view-toggle {
+    display: flex;
+    gap: 10px;
+  }
+  .view-toggle-btn {
+    padding: 8px 18px;
+    border-radius: 999px;
+    background: #F1EFE8;
+    color: #666;
+    font-size: 0.82rem;
+    font-weight: 700;
+    border: none;
+    cursor: pointer;
+  }
+  .view-toggle-btn.active {
+    background: #6464FF;
+    color: #fff;
+  }
+  .view-pane { display: none; }
+  .view-pane.active { display: block; }
+  .status-msg { font-size: 0.85rem; color: #888; padding: 20px 0; }
+
+  /* ── View 1: Year at a glance ── */
+  .yg-layout {
+    display: grid;
+    grid-template-columns: 1fr 240px;
+    gap: 24px;
+    align-items: start;
+  }
+  .yg-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 14px;
+  }
+  .yg-tile {
+    border: 1px solid #E5E2DC;
+    border-radius: 10px;
+    padding: 14px;
+    cursor: pointer;
+    background: #fff;
+    transition: border-color 0.12s;
+  }
+  .yg-tile:hover { border-color: #C7C3F7; }
+  .yg-tile.yg-current { border: 2px solid #6464FF; padding: 13px; }
+  .yg-tile-label {
+    font-size: 0.82rem;
+    font-weight: 700;
+    color: #999;
+    margin-bottom: 10px;
+  }
+  .yg-tile.yg-current .yg-tile-label { color: #6464FF; }
+  .yg-heat {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 2px;
+  }
+  .yg-heat-cell {
+    height: 6px;
+    border-radius: 2px;
+    background: #E5E2DC;
+  }
+  .yg-items-col {
+    border-left: 1px solid #E5E2DC;
+    padding-left: 18px;
+  }
+  .yg-items-label {
+    font-size: 0.72rem;
+    font-weight: 700;
+    color: #999;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    margin-bottom: 12px;
+  }
+  .yg-item {
+    font-size: 0.84rem;
+    color: #222;
+    margin-bottom: 12px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid #F0EEE8;
+  }
+  .yg-item:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
+  .yg-item-name { font-weight: 700; }
+  .yg-item-date { color: #999; font-size: 0.76rem; margin-top: 2px; }
+
+  /* ── View 2: Vertical full-year scroll ── */
+  .vs-layout {
+    display: grid;
+    grid-template-columns: 76px 1fr 200px;
+    gap: 20px;
+    align-items: start;
+  }
+  .vs-quarter-rail {
+    position: sticky;
+    top: 20px;
+    transition: opacity 0.25s;
+  }
+  .vs-quarter-year { font-size: 0.74rem; color: #999; font-weight: 700; }
+  .vs-quarter-q { font-size: 1.5rem; color: #6464FF; font-weight: 700; }
+  .vs-months-col { display: flex; flex-direction: column; gap: 36px; }
+  .vs-month-block { scroll-margin-top: 20px; }
+  .vs-month-title {
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: #222;
+    margin-bottom: 10px;
+  }
+  .calendar-grid {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 1px;
+    background: #E5E2DC;
+    border: 1px solid #E5E2DC;
+  }
+  .calendar-dow {
+    background: #fff;
+    text-align: center;
+    font-size: 0.68rem;
+    font-weight: 700;
+    color: #999;
+    padding: 4px 0;
+  }
+  .calendar-day {
+    background: #F5F5F4;
+    padding: 6px 7px;
+    min-height: 78px;
+    display: flex;
+    flex-direction: column;
+    font-size: 0.72rem;
+  }
+  .calendar-day.empty { background: #FAFAF8; }
+  .calendar-day.holiday { background: #F7DCE4; }
+  .calendar-day.today { outline: 2px solid #6464FF; outline-offset: -2px; }
+  .calendar-day.past { opacity: 0.5; }
+  .calendar-day-num { color: #666; font-weight: 600; margin-bottom: 3px; }
+  .day-event-badge {
+    color: #fff;
+    font-size: 0.62rem;
+    font-weight: 700;
+    border-radius: 3px;
+    padding: 2px 5px;
+    margin-bottom: 2px;
+    line-height: 1.25;
+  }
+  .day-ooo-row {
+    font-size: 0.62rem;
+    color: #666;
+    margin-top: auto;
+    line-height: 1.3;
+  }
+  .day-ooo-icon { margin-right: 2px; }
+  .vs-items-col {
+    border-left: 1px solid #E5E2DC;
+    padding-left: 14px;
+  }
+  .vs-items-label {
+    font-size: 0.68rem;
+    font-weight: 700;
+    color: #999;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    margin-bottom: 10px;
+  }
+  .vs-item {
+    font-size: 0.78rem;
+    color: #222;
+    margin-bottom: 10px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid #F0EEE8;
+  }
+  .vs-item:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
+  .vs-item-name { font-weight: 700; }
+  .vs-item-date { color: #999; font-size: 0.72rem; margin-top: 2px; }
+  .vs-items-empty { font-size: 0.78rem; color: #AAA; font-style: italic; }
+
+  @media (max-width: 900px) {
+    .yg-layout, .vs-layout { grid-template-columns: 1fr; }
+    .yg-grid { grid-template-columns: repeat(2, 1fr); }
+    .vs-quarter-rail { position: static; }
+  }
+</style>
+</head>
+<body>
+
+<div id="auth-overlay">
+  <div id="auth-box">
+    <h2>Leadership Calendar</h2>
+    <p>Please sign in to continue</p>
+    <input type="text" id="auth-user" placeholder="username" autocomplete="username" />
+    <input type="password" id="auth-pass" placeholder="password" autocomplete="current-password" />
+    <button onclick="checkAuth()">sign in</button>
+    <div id="auth-error"></div>
+  </div>
+</div>
+
+<div id="dashboard-content">
+
+<div class="page-header">
+  <div class="page-title">leadership calendar</div>
+  <div class="view-toggle">
+    <button class="view-toggle-btn active" id="toggle-year" onclick="switchView('year')">year at a glance</button>
+    <button class="view-toggle-btn" id="toggle-scroll" onclick="switchView('scroll')">full year</button>
+  </div>
+</div>
+
+<div id="pane-year" class="view-pane active">
+  <div class="status-msg" id="year-status">Loading calendar…</div>
+  <div class="yg-layout" id="year-layout" style="display:none;">
+    <div class="yg-grid" id="yg-grid"></div>
+    <div class="yg-items-col">
+      <div class="yg-items-label">individual items</div>
+      <div id="yg-items-list"></div>
+    </div>
+  </div>
+</div>
+
+<div id="pane-scroll" class="view-pane">
+  <div class="status-msg" id="scroll-status">Loading calendar…</div>
+  <div class="vs-layout" id="scroll-layout" style="display:none;">
+    <div class="vs-quarter-rail" id="vs-quarter-rail">
+      <div class="vs-quarter-year" id="vs-quarter-year">2026</div>
+      <div class="vs-quarter-q" id="vs-quarter-q">Q4</div>
+    </div>
+    <div class="vs-months-col" id="vs-months-col"></div>
+    <div></div>
+  </div>
+</div>
+
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<script>
+const LEADERSHIP_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSsb5OHT8jU_Ka17CUCkiL03smuHg0yXZwmEJR72UTFszwiuO6k5e4gBt_Kx6TIGA/pub?gid=1926429411&single=true&output=csv";
+const LEADERSHIP_EDIT_URL = "https://docs.google.com/spreadsheets/d/1H1cN97CCsAe9WrHzNTbNwQbGc3FIcndd/edit?usp=sharing";
+
+const EVENT_TYPE_COLORS = {
+  "Holiday": "#CD0F55",
+  "Conference": "#00A59B",
+  "Cell Science leadership": "#6464FF",
+  "Institute Leadership": "#8246E1",
+  "Hosting / Guest Visit": "#FF6E00",
+  "BOD/SAC": "#DC9600",
+  "Other": "#737373"
+};
+const OOO_PERSONAL_COLOR = "#C7C3F7";
+const OOO_TRAVEL_COLOR = "#F0C490";
+const EMPTY_COLOR = "#E5E2DC";
+
+const MONTH_NAMES = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+
+function parseLocalDate(str) {
+  if (!str) return null;
+  const m = String(str).trim().match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+  if (m) return new Date(parseInt(m[1]), parseInt(m[2]) - 1, parseInt(m[3]));
+  const d = new Date(str);
+  return isNaN(d) ? null : d;
+}
+
+function dateKey(d) {
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+}
+
+function mapRow(row) {
+  return {
+    RecordType: (row['Record Type'] || '').trim(),
+    Person: (row['Person'] || '').trim(),
+    OOOType: (row['OOO Type'] || '').trim(),
+    EventTitle: (row['Event Title'] || '').trim(),
+    EventType: (row['Event Type'] || '').trim(),
+    Start: (row['Start Date'] || '').trim(),
+    End: (row['End Date'] || '').trim(),
+    Notes: (row['Notes'] || '').trim()
+  };
+}
+
+function expandRow(row) {
+  const start = parseLocalDate(row.Start);
+  const end = parseLocalDate(row.End) || start;
+  const keys = [];
+  if (!start) return keys;
+  const cur = new Date(start);
+  while (cur <= end) {
+    keys.push(dateKey(cur));
+    cur.setDate(cur.getDate() + 1);
+  }
+  return keys;
+}
+
+function buildDayIndex(rows) {
+  const index = {};
+  rows.forEach(row => {
+    expandRow(row).forEach(key => {
+      if (!index[key]) index[key] = { events: [], ooo: [] };
+      if (row.RecordType === 'Event') index[key].events.push(row);
+      else index[key].ooo.push(row);
+    });
+  });
+  return index;
+}
+
+function escHtml(str) {
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+}
+
+function formatDateRange(startStr, endStr) {
+  const start = parseLocalDate(startStr);
+  if (!start) return '';
+  const end = parseLocalDate(endStr) || start;
+  const sameMonth = start.getMonth() === end.getMonth() && start.getFullYear() === end.getFullYear();
+  const startLabel = MONTH_NAMES[start.getMonth()].slice(0, 3) + ' ' + start.getDate();
+  if (start.getTime() === end.getTime()) return startLabel;
+  const endLabel = sameMonth ? String(end.getDate()) : (MONTH_NAMES[end.getMonth()].slice(0, 3) + ' ' + end.getDate());
+  return startLabel + '\u2013' + endLabel;
+}
+
+let allRows = [];
+let dayIndex = {};
+let monthList = []; // array of {year, month} for the rolling 12-month window
+
+function getMonthWindow(today) {
+  const months = [];
+  for (let i = 0; i < 12; i++) {
+    const d = new Date(today.getFullYear(), today.getMonth() + i, 1);
+    months.push({ year: d.getFullYear(), month: d.getMonth() });
+  }
+  return months;
+}
+
+function dayDominantColor(key, today) {
+  const data = dayIndex[key];
+  if (!data) return EMPTY_COLOR;
+  if (data.events.length) {
+    const ev = data.events[0];
+    return EVENT_TYPE_COLORS[ev.EventType] || EVENT_TYPE_COLORS['Other'];
+  }
+  if (data.ooo.some(o => o.OOOType === 'Personal')) return OOO_PERSONAL_COLOR;
+  if (data.ooo.some(o => o.OOOType === 'Work Travel')) return OOO_TRAVEL_COLOR;
+  return EMPTY_COLOR;
+}
+
+// ── Individual items (Hosting / Guest Visit entries) ──
+function getIndividualItems(rows, rangeStart, rangeEnd) {
+  return rows
+    .filter(r => r.RecordType === 'Event' && r.EventType === 'Hosting / Guest Visit')
+    .map(r => ({ ...r, _start: parseLocalDate(r.Start) }))
+    .filter(r => r._start && r._start.getTime() >= rangeStart.getTime() && r._start.getTime() <= rangeEnd.getTime())
+    .sort((a, b) => a._start.getTime() - b._start.getTime());
+}
+
+function renderItemsInto(container, items, emptyMsg) {
+  if (!items.length) {
+    container.innerHTML = `<div class="vs-items-empty">${escHtml(emptyMsg)}</div>`;
+    return;
+  }
+  container.innerHTML = items.map(item => `
+    <div class="vs-item">
+      <div class="vs-item-name">${escHtml(item.EventTitle || item.Person)}</div>
+      <div class="vs-item-date">${escHtml(formatDateRange(item.Start, item.End))}</div>
+    </div>
+  `).join('');
+}
+
+// ── View 1: Year at a Glance ──
+function renderYearGlance(today) {
+  const grid = document.getElementById('yg-grid');
+  grid.innerHTML = '';
+
+  monthList.forEach(({ year, month }, idx) => {
+    const isCurrent = year === today.getFullYear() && month === today.getMonth();
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    const cells = [];
+    for (let day = 1; day <= daysInMonth; day++) {
+      const dow = new Date(year, month, day).getDay();
+      if (dow === 0 || dow === 6) continue;
+      const key = year + '-' + String(month + 1).padStart(2, '0') + '-' + String(day).padStart(2, '0');
+      cells.push(dayDominantColor(key, today));
+    }
+    const tile = document.createElement('div');
+    tile.className = 'yg-tile' + (isCurrent ? ' yg-current' : '');
+    tile.onclick = () => jumpToMonth(idx);
+    tile.innerHTML = `
+      <div class="yg-tile-label">${MONTH_NAMES[month].toLowerCase()}${month === 0 ? ' ' + year : ''}</div>
+      <div class="yg-heat">${cells.map(c => `<div class="yg-heat-cell" style="background:${c}"></div>`).join('')}</div>
+    `;
+    grid.appendChild(tile);
+  });
+
+  const yearEnd = new Date(monthList[11].year, monthList[11].month + 1, 0);
+  const items = getIndividualItems(allRows, today, yearEnd);
+  renderItemsInto(document.getElementById('yg-items-list'), items, 'No individual items scheduled yet.');
+
+  document.getElementById('year-status').style.display = 'none';
+  document.getElementById('year-layout').style.display = '';
+}
+
+// ── View 2: Vertical full-year scroll ──
+function renderVerticalScroll(today) {
+  const col = document.getElementById('vs-months-col');
+  col.innerHTML = '';
+
+  monthList.forEach(({ year, month }) => {
+    const monthStart = new Date(year, month, 1);
+    const monthEnd = new Date(year, month + 1, 0);
+    const daysInMonth = monthEnd.getDate();
+
+    const block = document.createElement('div');
+    block.className = 'vs-month-block';
+    block.id = 'vs-month-' + year + '-' + month;
+    block.dataset.year = year;
+    block.dataset.month = month;
+
+    const inner = document.createElement('div');
+    inner.style.display = 'grid';
+    inner.style.gridTemplateColumns = '1fr 200px';
+    inner.style.gap = '20px';
+    inner.style.alignItems = 'start';
+
+    const mainCol = document.createElement('div');
+    const title = document.createElement('div');
+    title.className = 'vs-month-title';
+    title.textContent = MONTH_NAMES[month] + ' ' + year;
+    mainCol.appendChild(title);
+
+    const grid = document.createElement('div');
+    grid.className = 'calendar-grid';
+    ['M','T','W','T','F'].forEach(d => {
+      const dow = document.createElement('div');
+      dow.className = 'calendar-dow';
+      dow.textContent = d;
+      grid.appendChild(dow);
+    });
+
+    let firstPlaced = false;
+    for (let day = 1; day <= daysInMonth; day++) {
+      const dow = new Date(year, month, day).getDay();
+      if (dow === 0 || dow === 6) continue;
+      const monIndex = dow - 1;
+      if (!firstPlaced) {
+        for (let i = 0; i < monIndex; i++) {
+          const empty = document.createElement('div');
+          empty.className = 'calendar-day empty';
+          grid.appendChild(empty);
+        }
+        firstPlaced = true;
+      }
+
+      const key = year + '-' + String(month + 1).padStart(2, '0') + '-' + String(day).padStart(2, '0');
+      const cellDate = new Date(year, month, day);
+      const isToday = today.getFullYear() === year && today.getMonth() === month && today.getDate() === day;
+      const isPast = cellDate < new Date(today.getFullYear(), today.getMonth(), today.getDate());
+      const data = dayIndex[key];
+      const isHoliday = data && data.events.some(e => e.EventType === 'Holiday');
+
+      const cell = document.createElement('div');
+      cell.className = 'calendar-day' + (isToday ? ' today' : '') + (isHoliday ? ' holiday' : '') + (isPast ? ' past' : '');
+
+      const num = document.createElement('div');
+      num.className = 'calendar-day-num';
+      num.textContent = day;
+      cell.appendChild(num);
+
+      if (data && data.events.length) {
+        const ev = data.events[0];
+        const badge = document.createElement('div');
+        badge.className = 'day-event-badge';
+        badge.style.background = EVENT_TYPE_COLORS[ev.EventType] || EVENT_TYPE_COLORS['Other'];
+        badge.textContent = ev.EventTitle;
+        if (ev.Notes) badge.title = ev.Notes;
+        cell.appendChild(badge);
+      }
+
+      const personalEntries = data ? data.ooo.filter(o => o.OOOType === 'Personal') : [];
+      const travelEntries = data ? data.ooo.filter(o => o.OOOType === 'Work Travel') : [];
+      if (personalEntries.length) {
+        const row = document.createElement('div');
+        row.className = 'day-ooo-row';
+        row.innerHTML = '<span class="day-ooo-icon">\u{1F334}</span>' + personalEntries.map(o => escHtml(o.Person)).join(', ');
+        cell.appendChild(row);
+      }
+      if (travelEntries.length) {
+        const row = document.createElement('div');
+        row.className = 'day-ooo-row';
+        row.innerHTML = '<span class="day-ooo-icon">\u2708\uFE0F</span>' + travelEntries.map(o => escHtml(o.Person)).join(', ');
+        cell.appendChild(row);
+      }
+
+      grid.appendChild(cell);
+    }
+    mainCol.appendChild(grid);
+    inner.appendChild(mainCol);
+
+    const itemsCol = document.createElement('div');
+    itemsCol.className = 'vs-items-col';
+    itemsCol.innerHTML = '<div class="vs-items-label">this month</div><div class="vs-items-list"></div>';
+    const monthItems = getIndividualItems(allRows, monthStart, monthEnd);
+    renderItemsInto(itemsCol.querySelector('.vs-items-list'), monthItems, 'Nothing individual this month.');
+    inner.appendChild(itemsCol);
+
+    block.appendChild(inner);
+    col.appendChild(block);
+  });
+
+  document.getElementById('scroll-status').style.display = 'none';
+  document.getElementById('scroll-layout').style.display = '';
+  setupQuarterObserver();
+}
+
+function getQuarterLabel(month) {
+  return 'Q' + (Math.floor(month / 3) + 1);
+}
+
+function setupQuarterObserver() {
+  const blocks = document.querySelectorAll('.vs-month-block');
+  const yearEl = document.getElementById('vs-quarter-year');
+  const qEl = document.getElementById('vs-quarter-q');
+  const rail = document.getElementById('vs-quarter-rail');
+
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        const year = entry.target.dataset.year;
+        const month = parseInt(entry.target.dataset.month, 10);
+        const newQ = getQuarterLabel(month);
+        if (qEl.textContent !== newQ || yearEl.textContent !== String(year)) {
+          rail.style.opacity = '0.3';
+          setTimeout(() => {
+            yearEl.textContent = year;
+            qEl.textContent = newQ;
+            rail.style.opacity = '1';
+          }, 150);
+        }
+      }
+    });
+  }, { rootMargin: '-40% 0px -50% 0px', threshold: 0 });
+
+  blocks.forEach(b => observer.observe(b));
+}
+
+function jumpToMonth(idx) {
+  switchView('scroll');
+  const { year, month } = monthList[idx];
+  setTimeout(() => {
+    const el = document.getElementById('vs-month-' + year + '-' + month);
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, 50);
+}
+
+function switchView(view) {
+  document.getElementById('pane-year').classList.toggle('active', view === 'year');
+  document.getElementById('pane-scroll').classList.toggle('active', view === 'scroll');
+  document.getElementById('toggle-year').classList.toggle('active', view === 'year');
+  document.getElementById('toggle-scroll').classList.toggle('active', view === 'scroll');
+}
+
+async function loadCalendar() {
+  const today = new Date();
+  monthList = getMonthWindow(today);
+  try {
+    const res = await fetch(LEADERSHIP_CSV_URL);
+    if (!res.ok) throw new Error('Fetch failed: ' + res.status);
+    const text = await res.text();
+    const parsed = Papa.parse(text, { header: true, skipEmptyLines: true });
+    allRows = parsed.data.map(mapRow).filter(r => r.RecordType);
+    dayIndex = buildDayIndex(allRows);
+    renderYearGlance(today);
+    renderVerticalScroll(today);
+  } catch (err) {
+    console.error('Calendar load error:', err);
+    document.getElementById('year-status').textContent = 'Unable to load the calendar right now. Check that the sheet is published and the link is correct.';
+    document.getElementById('scroll-status').textContent = 'Unable to load the calendar right now.';
+  }
+}
+
+const CORRECT_USER = "Cell Science leadership";
+const CORRECT_PASS = "c@lenDAR";
+const SESSION_KEY = "leadership_calendar_auth";
+
+function showDashboard() {
+  document.getElementById('auth-overlay').classList.add('hidden');
+  document.getElementById('dashboard-content').style.display = 'block';
+  loadCalendar();
+}
+
+function checkAuth() {
+  const user = document.getElementById('auth-user').value;
+  const pass = document.getElementById('auth-pass').value;
+  if (user === CORRECT_USER && pass === CORRECT_PASS) {
+    try {
+      localStorage.setItem(SESSION_KEY, 'true');
+    } catch (err) {
+      console.warn('Could not persist login (localStorage unavailable):', err);
+    }
+    showDashboard();
+  } else {
+    const box = document.getElementById('auth-box');
+    const err = document.getElementById('auth-error');
+    err.textContent = 'incorrect username or password — please try again';
+    box.classList.remove('shake');
+    void box.offsetWidth;
+    box.classList.add('shake');
+    document.getElementById('auth-pass').value = '';
+  }
+}
+
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'Enter' && !document.getElementById('auth-overlay').classList.contains('hidden')) {
+    checkAuth();
+  }
+});
+
+window.onload = function() {
+  let alreadyAuthed = false;
+  try {
+    alreadyAuthed = localStorage.getItem(SESSION_KEY) === 'true';
+  } catch (err) {
+    console.warn('localStorage unavailable:', err);
+  }
+  if (alreadyAuthed) {
+    showDashboard();
+  }
+};
+</script>
+
+</body>
+</html>
