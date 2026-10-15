@@ -222,7 +222,7 @@
   }
   .vs-quarter-rail {
     position: sticky;
-    top: 110px;
+    top: 170px;
     transition: opacity 0.25s;
   }
   .vs-quarter-year { font-size: 0.86rem; color: #999; font-weight: 700; letter-spacing: 0.14em; }
@@ -296,6 +296,11 @@
     padding-left: 14px;
     margin-top: 32px;
   }
+  .vs-items-list {
+    max-height: 600px;
+    overflow-y: auto;
+    padding-right: 6px;
+  }
   .vs-items-label {
     font-size: 0.68rem;
     font-weight: 700;
@@ -325,6 +330,28 @@
   .vs-item-details li { margin-bottom: 2px; }
   .vs-item-details li:last-child { margin-bottom: 0; }
   .vs-items-empty { font-size: 0.78rem; color: #AAA; font-style: italic; }
+  .vs-actions-col { border-left: 1px solid #E5E2DC; }
+  .vs-actions-list {
+    max-height: 600px;
+    overflow-y: auto;
+    padding-right: 6px;
+  }
+  .vs-action-item {
+    font-size: 0.78rem;
+    color: #222;
+    margin-bottom: 10px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid #F0EEE8;
+  }
+  .vs-action-item:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
+  .vs-action-name { font-weight: 700; }
+  .vs-action-meta { color: #999; font-size: 0.72rem; margin-top: 2px; }
+  .vs-action-item.vs-action-done {
+    opacity: 0.45;
+  }
+  .vs-action-item.vs-action-done .vs-action-name {
+    text-decoration: line-through;
+  }
   .cal-legend {
     margin-top: 20px;
     padding-top: 14px;
@@ -332,6 +359,11 @@
     display: flex;
     flex-wrap: wrap;
     gap: 6px 14px;
+  }
+  #header-legend .cal-legend {
+    margin-top: 0;
+    padding-top: 10px;
+    border-top: 1px solid #EFECE5;
   }
   .cal-legend-item {
     display: inline-flex;
@@ -380,6 +412,7 @@
     <div class="page-title">leadership calendar</div>
     <a href="https://docs.google.com/spreadsheets/d/1H1cN97CCsAe9WrHzNTbNwQbGc3FIcndd/edit?usp=sharing" target="_blank" class="sheet-link">open sheet to edit</a>
   </div>
+  <div id="header-legend"></div>
 </div>
 
 <div id="pane-scroll" class="view-pane active">
@@ -518,6 +551,80 @@ function getIndividualItems(rows, rangeStart, rangeEnd) {
     .sort((a, b) => a._start.getTime() - b._start.getTime());
 }
 
+// ── Leadership Actions / Focus Items ──
+const ACTION_ITEMS_CSV_URL = "REPLACE_WITH_ACTION_ITEMS_CSV_URL";
+let allActionRows = [];
+
+function mapActionRow(row) {
+  return {
+    Item: (row['Item'] || '').trim(),
+    Month: (row['Month'] || '').trim(),
+    DueDate: (row['Due Date'] || '').trim(),
+    AssignedTo: (row['Assigned To'] || '').trim(),
+    Status: (row['Status'] || '').trim()
+  };
+}
+
+// Parses a "Month" cell formatted as "October 2026" into {year, monthIdx}.
+function parseActionMonth(str) {
+  if (!str) return null;
+  const yearMatch = str.match(/\d{4}/);
+  if (!yearMatch) return null;
+  const year = parseInt(yearMatch[0], 10);
+  const lower = str.toLowerCase();
+  const monthIdx = MONTH_NAMES.findIndex(m => lower.startsWith(m.toLowerCase()) || lower.includes(m.toLowerCase().slice(0, 3)));
+  if (monthIdx === -1) return null;
+  return { year, monthIdx };
+}
+
+function getActionItemsForMonth(rows, year, month) {
+  return rows.filter(r => {
+    const m = parseActionMonth(r.Month);
+    return m && m.year === year && m.monthIdx === month;
+  }).sort((a, b) => {
+    const aDone = a.Status.toLowerCase() === 'completed' ? 1 : 0;
+    const bDone = b.Status.toLowerCase() === 'completed' ? 1 : 0;
+    if (aDone !== bDone) return aDone - bDone;
+    const aDate = parseLocalDate(a.DueDate);
+    const bDate = parseLocalDate(b.DueDate);
+    const aTime = aDate ? aDate.getTime() : Infinity;
+    const bTime = bDate ? bDate.getTime() : Infinity;
+    return aTime - bTime;
+  });
+}
+
+function renderActionsInto(container, items) {
+  if (!items.length) {
+    container.innerHTML = `<div class="vs-items-empty">No focus items logged for this month yet.</div>`;
+    return;
+  }
+  container.innerHTML = items.map(item => {
+    const isDone = item.Status.toLowerCase() === 'completed';
+    const dueLabel = item.DueDate ? formatDateRange(item.DueDate, item.DueDate) : '';
+    return `
+      <div class="vs-action-item${isDone ? ' vs-action-done' : ''}">
+        <div class="vs-action-name">${escHtml(item.Item)}</div>
+        ${item.AssignedTo ? `<div class="vs-action-meta">${escHtml(item.AssignedTo)}</div>` : ''}
+        ${dueLabel ? `<div class="vs-action-meta">${escHtml(dueLabel)}</div>` : ''}
+      </div>
+    `;
+  }).join('');
+}
+
+async function loadActionItems() {
+  if (ACTION_ITEMS_CSV_URL.indexOf('REPLACE_WITH') === 0) return;
+  try {
+    const res = await fetch(ACTION_ITEMS_CSV_URL);
+    if (!res.ok) throw new Error('Fetch failed: ' + res.status);
+    const text = await res.text();
+    const parsed = Papa.parse(text, { header: true, skipEmptyLines: true });
+    allActionRows = parsed.data.map(mapActionRow).filter(r => r.Item);
+    renderVerticalScroll(lastRenderedToday);
+  } catch (err) {
+    console.error('Leadership actions load error:', err);
+  }
+}
+
 function buildLegendHtml() {
   const typeRows = Object.entries(EVENT_TYPE_COLORS).map(([label, color]) =>
     `<div class="cal-legend-item"><span class="cal-legend-dot" style="background:${color}"></span>${escHtml(label)}</div>`
@@ -574,7 +681,7 @@ function renderVerticalScroll(today) {
 
     const inner = document.createElement('div');
     inner.style.display = 'grid';
-    inner.style.gridTemplateColumns = '1fr 200px';
+    inner.style.gridTemplateColumns = '1fr 190px 190px';
     inner.style.gap = '20px';
     inner.style.alignItems = 'start';
 
@@ -664,10 +771,17 @@ function renderVerticalScroll(today) {
 
     const itemsCol = document.createElement('div');
     itemsCol.className = 'vs-items-col';
-    itemsCol.innerHTML = '<div class="vs-items-label">this month</div><div class="vs-items-list"></div>' + buildLegendHtml();
+    itemsCol.innerHTML = '<div class="vs-items-label">this month</div><div class="vs-items-list"></div>';
     const monthItems = getIndividualItems(allRows, monthStart, monthEnd);
     renderItemsInto(itemsCol.querySelector('.vs-items-list'), monthItems, 'Nothing individual this month.');
     inner.appendChild(itemsCol);
+
+    const actionsCol = document.createElement('div');
+    actionsCol.className = 'vs-items-col vs-actions-col';
+    actionsCol.innerHTML = '<div class="vs-items-label">leadership actions / focus items</div><div class="vs-actions-list"></div>';
+    const monthActions = getActionItemsForMonth(allActionRows, year, month);
+    renderActionsInto(actionsCol.querySelector('.vs-actions-list'), monthActions);
+    inner.appendChild(actionsCol);
 
     block.appendChild(inner);
     col.appendChild(block);
@@ -709,8 +823,11 @@ function setupQuarterObserver() {
   blocks.forEach(b => observer.observe(b));
 }
 
+let lastRenderedToday = new Date();
+
 async function loadCalendar() {
   const today = new Date();
+  lastRenderedToday = today;
   monthList = getMonthWindow(today);
   try {
     const res = await fetch(LEADERSHIP_CSV_URL);
@@ -720,6 +837,7 @@ async function loadCalendar() {
     allRows = parsed.data.map(mapRow).filter(r => r.RecordType);
     dayIndex = buildDayIndex(allRows);
     renderVerticalScroll(today);
+    loadActionItems();
   } catch (err) {
     console.error('Calendar load error:', err);
     document.getElementById('scroll-status').textContent = 'Unable to load the calendar right now. Check that the sheet is published and the link is correct.';
@@ -743,6 +861,8 @@ function showDashboard() {
   document.getElementById('auth-overlay').classList.add('hidden');
   document.getElementById('dashboard-content').style.display = 'block';
   matchLogoWidthToTitle();
+  const legendSlot = document.getElementById('header-legend');
+  if (legendSlot) legendSlot.innerHTML = buildLegendHtml();
   loadCalendar();
 }
 
