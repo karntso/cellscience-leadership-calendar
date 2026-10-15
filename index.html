@@ -312,6 +312,7 @@
     border-bottom: 1px solid #F0EEE8;
   }
   .vs-item:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
+  .vs-item.vs-item-past { opacity: 0.45; }
   .vs-item-name { font-weight: 700; }
   .vs-item-date { color: #999; font-size: 0.72rem; margin-top: 2px; }
   .vs-item-details {
@@ -328,20 +329,21 @@
     margin-top: 20px;
     padding-top: 14px;
     border-top: 1px solid #F0EEE8;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 14px;
   }
   .cal-legend-item {
-    display: flex;
+    display: inline-flex;
     align-items: center;
-    gap: 7px;
-    font-size: 0.72rem;
+    gap: 6px;
+    font-size: 0.7rem;
     color: #666;
-    margin-bottom: 7px;
-    text-align: left;
+    white-space: nowrap;
   }
-  .cal-legend-item:last-child { margin-bottom: 0; }
   .cal-legend-dot {
-    width: 9px;
-    height: 9px;
+    width: 8px;
+    height: 8px;
     border-radius: 50%;
     flex-shrink: 0;
   }
@@ -510,7 +512,7 @@ function dayDominantColor(key, today) {
 // ── Individual items (Hosting / Guest Visit entries) ──
 function getIndividualItems(rows, rangeStart, rangeEnd) {
   return rows
-    .filter(r => r.RecordType === 'Event' && r.EventType === 'Hosting / Guest Visit')
+    .filter(r => r.RecordType === 'Event')
     .map(r => ({ ...r, _start: parseLocalDate(r.Start) }))
     .filter(r => r._start && r._start.getTime() >= rangeStart.getTime() && r._start.getTime() <= rangeEnd.getTime())
     .sort((a, b) => a._start.getTime() - b._start.getTime());
@@ -538,13 +540,19 @@ function renderItemsInto(container, items, emptyMsg) {
     container.innerHTML = `<div class="vs-items-empty">${escHtml(emptyMsg)}</div>`;
     return;
   }
-  container.innerHTML = items.map(item => `
-    <div class="vs-item">
+  const today = new Date();
+  const todayMidnight = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  container.innerHTML = items.map(item => {
+    const lastDate = parseLocalDate(item.End) || parseLocalDate(item.Start);
+    const isPast = !!lastDate && lastDate < todayMidnight;
+    return `
+    <div class="vs-item${isPast ? ' vs-item-past' : ''}">
       <div class="vs-item-name">${escHtml(item.EventTitle || item.Person)}</div>
       <div class="vs-item-date">${escHtml(formatDateRange(item.Start, item.End))}</div>
       ${buildDetailsHtml(item.Details)}
     </div>
-  `).join('');
+  `;
+  }).join('');
 }
 
 // ── View 1: Year at a Glance ──
@@ -722,9 +730,19 @@ const CORRECT_USER = "Cell Science leadership";
 const CORRECT_PASS = "c@lenDAR";
 const SESSION_KEY = "leadership_calendar_auth";
 
+function matchLogoWidthToTitle() {
+  const title = document.querySelector('.page-title');
+  const logo = document.getElementById('page-logo');
+  if (title && logo) {
+    const titleWidth = title.getBoundingClientRect().width;
+    if (titleWidth > 0) logo.style.width = titleWidth + 'px';
+  }
+}
+
 function showDashboard() {
   document.getElementById('auth-overlay').classList.add('hidden');
   document.getElementById('dashboard-content').style.display = 'block';
+  matchLogoWidthToTitle();
   loadCalendar();
 }
 
