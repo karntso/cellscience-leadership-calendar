@@ -348,6 +348,16 @@
   .vs-action-item:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
   .vs-action-name { font-weight: 700; }
   .vs-action-meta { color: #999; font-size: 0.72rem; margin-top: 2px; }
+  .vs-action-list {
+    margin: 6px 0 0;
+    padding-left: 16px;
+    font-size: 0.74rem;
+    color: #555;
+    line-height: 1.5;
+  }
+  .vs-action-list li { margin-bottom: 2px; }
+  .vs-action-list li:last-child { margin-bottom: 0; }
+  .vs-action-assignee { color: #222; }
   .vs-action-item.vs-action-done {
     opacity: 0.45;
   }
@@ -563,6 +573,7 @@ function mapActionRow(row) {
     Month: (row['Month'] || '').trim(),
     DueDate: (row['Due Date'] || '').trim(),
     AssignedTo: (row['Assigned To'] || '').trim(),
+    Details: (row['Details'] || '').trim(),
     Status: (row['Status'] || '').trim()
   };
 }
@@ -603,11 +614,17 @@ function renderActionsInto(container, items) {
   container.innerHTML = items.map(item => {
     const isDone = item.Status.toLowerCase() === 'completed';
     const dueLabel = item.DueDate ? formatDateRange(item.DueDate, item.DueDate) : '';
+    const detailsLines = item.Details
+      ? item.Details.split('\n').map(l => l.trim()).filter(l => l).map(l => l.replace(/^[•\-\u2022]\s*/, ''))
+      : [];
+    const listItemsHtml =
+      (item.AssignedTo ? `<li class="vs-action-assignee">${escHtml(item.AssignedTo)}</li>` : '') +
+      detailsLines.map(l => `<li>${escHtml(l)}</li>`).join('');
     return `
       <div class="vs-action-item${isDone ? ' vs-action-done' : ''}">
         <div class="vs-action-name">${escHtml(item.Item)}</div>
         ${dueLabel ? `<div class="vs-action-meta">${escHtml(dueLabel)}</div>` : ''}
-        ${item.AssignedTo ? `<div class="vs-action-meta">&#8226; ${escHtml(item.AssignedTo)}</div>` : ''}
+        ${listItemsHtml ? `<ul class="vs-action-list">${listItemsHtml}</ul>` : ''}
       </div>
     `;
   }).join('');
