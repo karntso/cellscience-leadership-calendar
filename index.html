@@ -308,6 +308,8 @@
     text-transform: uppercase;
     letter-spacing: 0.04em;
     margin-bottom: 10px;
+    min-height: 28px;
+    line-height: 1.4;
   }
   .vs-item {
     font-size: 0.78rem;
@@ -604,8 +606,8 @@ function renderActionsInto(container, items) {
     return `
       <div class="vs-action-item${isDone ? ' vs-action-done' : ''}">
         <div class="vs-action-name">${escHtml(item.Item)}</div>
-        ${item.AssignedTo ? `<div class="vs-action-meta">${escHtml(item.AssignedTo)}</div>` : ''}
         ${dueLabel ? `<div class="vs-action-meta">${escHtml(dueLabel)}</div>` : ''}
+        ${item.AssignedTo ? `<div class="vs-action-meta">&#8226; ${escHtml(item.AssignedTo)}</div>` : ''}
       </div>
     `;
   }).join('');
@@ -681,7 +683,7 @@ function renderVerticalScroll(today) {
 
     const inner = document.createElement('div');
     inner.style.display = 'grid';
-    inner.style.gridTemplateColumns = '1fr 190px 190px';
+    inner.style.gridTemplateColumns = '1fr 190px 240px';
     inner.style.gap = '20px';
     inner.style.alignItems = 'start';
 
