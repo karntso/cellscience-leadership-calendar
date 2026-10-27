@@ -358,6 +358,45 @@
   .vs-action-list li { margin-bottom: 2px; }
   .vs-action-list li:last-child { margin-bottom: 0; }
   .vs-action-assignee { color: #222; }
+  .vs-materials-col { border-left: 1px solid #E5E2DC; }
+  .vs-materials-list {
+    max-height: 600px;
+    overflow-y: auto;
+    padding-right: 6px;
+  }
+  .vs-material-group {
+    margin-bottom: 12px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid #F0EEE8;
+  }
+  .vs-material-group:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
+  .vs-material-title {
+    font-size: 0.78rem;
+    font-weight: 700;
+    color: #222;
+    margin-bottom: 8px;
+  }
+  .vs-material-btns {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .vs-material-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 6px 12px;
+    border-radius: 999px;
+    background: #EDEDFF;
+    color: #6464FF;
+    font-size: 0.72rem;
+    font-weight: 700;
+    text-decoration: none;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .vs-material-btn:hover { background: #6464FF; color: #fff; }
   .vs-action-item.vs-action-done {
     opacity: 0.45;
   }
@@ -645,6 +684,63 @@ async function loadActionItems() {
   }
 }
 
+// ── Materials ──
+const MATERIALS_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSsb5OHT8jU_Ka17CUCkiL03smuHg0yXZwmEJR72UTFszwiuO6k5e4gBt_Kx6TIGA/pub?gid=270904621&single=true&output=csv";
+let allMaterialRows = [];
+
+function mapMaterialRow(row) {
+  return {
+    Month: (row['Month'] || '').trim(),
+    Title: (row['Title'] || row['Item'] || '').trim(),
+    Links: (row['Links'] || row['Materials'] || '').trim()
+  };
+}
+
+function getMaterialsForMonth(rows, year, month) {
+  return rows.filter(r => {
+    const m = parseActionMonth(r.Month);
+    return m && m.year === year && m.monthIdx === month;
+  });
+}
+
+function buildMaterialButtonsHtml(links) {
+  if (!links) return '';
+  return links.split('\n').map(line => {
+    const parts = line.split('|');
+    const label = (parts[0] || '').trim();
+    const url = (parts[1] || '').trim();
+    if (!url) return '';
+    return `<a class="vs-material-btn" href="${escHtml(url)}" target="_blank">${escHtml(label || 'link')}</a>`;
+  }).filter(b => b).join('');
+}
+
+function renderMaterialsInto(container, items) {
+  if (!items.length) {
+    container.innerHTML = `<div class="vs-items-empty">No materials logged for this month yet.</div>`;
+    return;
+  }
+  container.innerHTML = items.map(item => `
+    <div class="vs-material-group">
+      ${item.Title ? `<div class="vs-material-title">${escHtml(item.Title)}</div>` : ''}
+      <div class="vs-material-btns">${buildMaterialButtonsHtml(item.Links)}</div>
+    </div>
+  `).join('');
+}
+
+async function loadMaterials() {
+  if (MATERIALS_CSV_URL.indexOf('REPLACE_WITH') === 0) return;
+  try {
+    const res = await fetch(MATERIALS_CSV_URL);
+    if (!res.ok) throw new Error('Fetch failed: ' + res.status);
+    const text = await res.text();
+    const parsed = Papa.parse(text, { header: true, skipEmptyLines: true });
+    allMaterialRows = parsed.data.map(mapMaterialRow).filter(r => r.Month);
+    renderVerticalScroll(lastRenderedToday);
+  } catch (err) {
+    console.error('Materials load error:', err);
+  }
+}
+
 function buildLegendHtml() {
   const typeRows = Object.entries(EVENT_TYPE_COLORS).map(([label, color]) =>
     `<div class="cal-legend-item"><span class="cal-legend-dot" style="background:${color}"></span>${escHtml(label)}</div>`
@@ -701,7 +797,7 @@ function renderVerticalScroll(today) {
 
     const inner = document.createElement('div');
     inner.style.display = 'grid';
-    inner.style.gridTemplateColumns = '1fr 190px 240px';
+    inner.style.gridTemplateColumns = '1fr 190px 240px 200px';
     inner.style.gap = '20px';
     inner.style.alignItems = 'start';
 
@@ -810,6 +906,13 @@ function renderVerticalScroll(today) {
     renderActionsInto(actionsCol.querySelector('.vs-actions-list'), monthActions);
     inner.appendChild(actionsCol);
 
+    const materialsCol = document.createElement('div');
+    materialsCol.className = 'vs-items-col vs-materials-col';
+    materialsCol.innerHTML = '<div class="vs-items-label">materials</div><div class="vs-materials-list"></div>';
+    const monthMaterials = getMaterialsForMonth(allMaterialRows, year, month);
+    renderMaterialsInto(materialsCol.querySelector('.vs-materials-list'), monthMaterials);
+    inner.appendChild(materialsCol);
+
     block.appendChild(inner);
     col.appendChild(block);
   });
@@ -865,6 +968,7 @@ async function loadCalendar() {
     dayIndex = buildDayIndex(allRows);
     renderVerticalScroll(today);
     loadActionItems();
+    loadMaterials();
   } catch (err) {
     console.error('Calendar load error:', err);
     document.getElementById('scroll-status').textContent = 'Unable to load the calendar right now. Check that the sheet is published and the link is correct.';
